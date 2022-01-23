@@ -2,6 +2,7 @@
 import os
 import argparse
 
+import numpy
 import torch
 import scipy.stats as sp
 import matplotlib.pyplot as plt
@@ -25,10 +26,10 @@ def parse_args():
     """
     parser = argparse.ArgumentParser(description='Analyze network performance.')
     parser.add_argument('--model', '-m',
-                        default='XceptionBased', type=str,
+                        default='SimpleNet', type=str,
                         help='Model name: SimpleNet or XceptionBased.')
     parser.add_argument('--checkpoint_path', '-cpp',
-                        default='checkpoints/XceptionBased.pt', type=str,
+                        default='checkpoints/fakes_dataset_SimpleNet_Adam.pt', type=str,
                         help='Path to model checkpoint.')
     parser.add_argument('--dataset', '-d',
                         default='fakes_dataset', type=str,
@@ -57,8 +58,25 @@ def get_soft_scores_and_true_labels(dataset, model):
         inference result on the images in the dataset (data in index = 1).
         gt_labels: an iterable holding the samples' ground truth labels.
     """
-    """INSERT YOUR CODE HERE, overrun return."""
-    return torch.rand(100, ), torch.rand(100, ), torch.randint(0, 2, (100, ))
+    score_dataloader = DataLoader(dataset,
+                                  batch_size=128,
+                                  shuffle=False)
+    soft_score_1 = numpy.zeros(len(dataset))
+    soft_score_2 = numpy.zeros(len(dataset))
+    gt = numpy.zeros(len(dataset))
+    model.to(device)
+    with torch.no_grad():
+        for batch_idx, (image, label) in enumerate(score_dataloader):
+
+            image = image.to(device)
+            pred = model(image).cpu().detach().numpy()
+            soft_score_1[batch_idx*128:(batch_idx+1)*128] = pred[:,0]
+            soft_score_2[batch_idx*128:(batch_idx+1)*128] = pred[:,1]
+            gt[batch_idx*128:(batch_idx+1)*128] = label.detach().numpy()
+
+
+
+    return soft_score_1, soft_score_2, gt
 
 
 def plot_roc_curve(roc_curve_figure,
@@ -169,7 +187,6 @@ def main():
     det_curve_figure.savefig(
         os.path.join(FIGURES_DIR,
                      f'{args.dataset}_{args.model}_det_curve.png'))
-
 
 if __name__ == '__main__':
     main()

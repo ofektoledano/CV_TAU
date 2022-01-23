@@ -24,10 +24,10 @@ def parse_args():
     """
     parser = argparse.ArgumentParser(description='Analyze network performance.')
     parser.add_argument('--model', '-m',
-                        default='XceptionBased', type=str,
+                        default='SimpleNet', type=str,
                         help='Model name: SimpleNet or XceptionBased.')
     parser.add_argument('--checkpoint_path', '-cpp',
-                        default='checkpoints/XceptionBased.pt', type=str,
+                        default='checkpoints/fakes_dataset_SimpleNet_model.pt', type=str,
                         help='Path to model checkpoint.')
     parser.add_argument('--dataset', '-d',
                         default='fakes_dataset', type=str,
@@ -51,8 +51,27 @@ def get_grad_cam_visualization(test_dataset: torch.utils.data.Dataset,
         the true label of that sample (since it is an output of a DataLoader
         of batch size 1, it's a tensor of shape (1,)).
     """
-    """INSERT YOUR CODE HERE, overrun return."""
-    return np.random.rand(256, 256, 3), torch.randint(0, 2, (1,))
+    from pytorch_grad_cam import GradCAM
+    from pytorch_grad_cam.utils.image import show_cam_on_image
+
+    target_layers = [model.conv3]
+    input_tensor,true_label = next(iter(DataLoader(test_dataset,
+                                                    batch_size=1,
+                                                    shuffle=True))) # Take a random image
+
+    cam = GradCAM(model=model, target_layers=target_layers, use_cuda=torch.cuda.is_available()) # Create GradCAM model on conv3 layer
+
+    grayscale_cam = cam(input_tensor=input_tensor)
+    grayscale_cam = grayscale_cam[0, :]
+    # turn the tensor back to RGB
+    rgb_img = np.transpose(input_tensor.squeeze(),(1, 2, 0))
+    rgb_img -= rgb_img.min()
+    rgb_img /= rgb_img.max()
+    rgb_img = rgb_img.detach().numpy().astype(np.float32)
+
+    visualization = show_cam_on_image(rgb_img, grayscale_cam, use_rgb=True)
+
+    return visualization, true_label
 
 
 def main():

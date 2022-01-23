@@ -61,8 +61,13 @@ def compute_gradient_saliency_maps(samples: torch.tensor,
         saliency: vanilla gradient saliency maps. This should be a tensor of
         shape Bx256x256 where B is the number of images in samples.
     """
-    """INSERT YOUR CODE HERE, overrun return."""
-    return torch.rand(6, 256, 256)
+    model.eval()
+    samples.requires_grad = True
+    pred = model(samples)
+    labels_scores = pred.gather(1, true_labels.view(-1, 1)).squeeze()
+    labels_scores.backward(torch.ones_like(labels_scores))
+    saliency, _  = samples.grad.data.abs().max(dim=1)
+    return saliency
 
 
 def main():  # pylint: disable=R0914, R0915
@@ -148,13 +153,14 @@ def main():  # pylint: disable=R0914, R0915
     all_real_saliency_maps = torch.cat(real_images_saliency_maps)
     all_fake_saliency_maps = torch.cat(fake_images_saliency_maps)
 
-    for idx in range(all_real_saliency_maps.shape[0]):
-        all_real_saliency_maps[idx] -= all_real_saliency_maps[idx].min()
-        all_real_saliency_maps[idx] /= all_real_saliency_maps[idx].max()
-
-    for idx in range(all_fake_saliency_maps.shape[0]):
-        all_fake_saliency_maps[idx] -= all_fake_saliency_maps[idx].min()
-        all_fake_saliency_maps[idx] /= all_fake_saliency_maps[idx].max()
+    # commented out because it whitens the fake saliancy image.
+    # for idx in range(all_real_saliency_maps.shape[0]):
+    #     all_real_saliency_maps[idx] -= all_real_saliency_maps[idx].min()
+    #     all_real_saliency_maps[idx] /= all_real_saliency_maps[idx].max()
+    #
+    # for idx in range(all_fake_saliency_maps.shape[0]):
+    #     all_fake_saliency_maps[idx] -= all_fake_saliency_maps[idx].min()
+    #     all_fake_saliency_maps[idx] /= all_fake_saliency_maps[idx].max()
 
     mean_saliency_maps = plt.figure()
     plt.subplot(1, 2, 1)

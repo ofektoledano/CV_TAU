@@ -12,7 +12,6 @@ from common import OUTPUT_DIR, CHECKPOINT_DIR
 
 device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
 
-
 @dataclass
 class LoggingParameters:
     """Data class holding parameters for logging."""
@@ -41,6 +40,7 @@ class Trainer:
         self.test_dataset = test_dataset
         self.epoch = 0
 
+    @property
     def train_one_epoch(self) -> tuple[float, float]:
         """Train the model for a single epoch on the training dataset.
         Returns:
@@ -51,7 +51,6 @@ class Trainer:
         total_loss = 0
         avg_loss = 0
         accuracy = 0
-        nof_samples = 0
         correct_labeled_samples = 0
 
         train_dataloader = DataLoader(self.train_dataset,
@@ -60,7 +59,20 @@ class Trainer:
         print_every = int(len(train_dataloader) / 10)
 
         for batch_idx, (inputs, targets) in enumerate(train_dataloader):
-            """INSERT YOUR CODE HERE."""
+            inputs, targets = inputs.to(device), targets.to(device)
+            # Compute prediction and loss
+            nof_samples = (batch_idx+1)*train_dataloader.batch_size
+            self.optimizer.zero_grad()
+            pred = self.model(inputs)
+            loss = self.criterion(pred,targets)
+            # Backpropagation
+            loss.backward()
+            self.optimizer.step()
+
+            total_loss += loss.item()
+            avg_loss = total_loss/(batch_idx + 1)
+            correct_labeled_samples += (pred.argmax(1) == targets).type(torch.float).sum().item()
+            accuracy = (100*(correct_labeled_samples/nof_samples))
             if batch_idx % print_every == 0 or \
                     batch_idx == len(train_dataloader) - 1:
                 print(f'Epoch [{self.epoch:03d}] | Loss: {avg_loss:.3f} | '
@@ -87,18 +99,24 @@ class Trainer:
         total_loss = 0
         avg_loss = 0
         accuracy = 0
-        nof_samples = 0
         correct_labeled_samples = 0
         print_every = max(int(len(dataloader) / 10), 1)
 
-        for batch_idx, (inputs, targets) in enumerate(dataloader):
-            """INSERT YOUR CODE HERE."""
-            if batch_idx % print_every == 0 or batch_idx == len(dataloader) - 1:
-                print(f'Epoch [{self.epoch:03d}] | Loss: {avg_loss:.3f} | '
-                      f'Acc: {accuracy:.2f}[%] '
-                      f'({correct_labeled_samples}/{nof_samples})')
+        with torch.no_grad():
+            for batch_idx, (inputs, targets) in enumerate(dataloader):
+                nof_samples = (batch_idx + 1) * dataloader.batch_size
+                inputs, targets = inputs.to(device), targets.to(device)
+                pred = self.model(inputs)
+                total_loss += self.criterion(pred, targets).item()
+                correct_labeled_samples += (pred.argmax(1) == targets).type(torch.float).sum().item()
+                avg_loss = total_loss/(batch_idx+1)
+                accuracy = 100*(correct_labeled_samples/nof_samples)
+                if batch_idx % print_every == 0 or batch_idx == len(dataloader) - 1:
+                    print(f'Epoch [{self.epoch:03d}] | Loss: {avg_loss:.3f} | '
+                          f'Acc: {accuracy:.2f}[%] '
+                          f'({correct_labeled_samples}/{nof_samples})')
 
-        return avg_loss, accuracy
+            return avg_loss, accuracy
 
     def validate(self):
         """Evaluate the model performance."""
@@ -163,7 +181,7 @@ class Trainer:
         for self.epoch in range(1, epochs + 1):
             print(f'Epoch {self.epoch}/{epochs}')
 
-            train_loss, train_acc = self.train_one_epoch()
+            train_loss, train_acc = self.train_one_epoch
             val_loss, val_acc = self.validate()
             test_loss, test_acc = self.test()
 
